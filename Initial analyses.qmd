@@ -1,0 +1,77 @@
+---
+tite: Initial Analyses
+author: Melody Royster
+date: today
+date-format: long
+format: typst
+editor_options: 
+  chunk_output_type: console
+---
+
+# Question 1: Where to located your data (a link is preferable), How to download it, and where to save it in order for your code to run?
+
+For my project, I will use two .csv data files from *IPEDS*, the 2023 academic libraries AL2023 and Institutional characteristic, data/hd2022.csv. This files are located within my data file. The original data files can be downloaded from the following links: https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx?sid=5c05e2f4-be4f-4c65-a205-5b539f20afc7&rtid=7
+
+# Question 2: The code
+
+```{r}
+library (tidyverse)
+library(haven)
+
+data_nolabels <- read_csv("data/hd2022.csv")
+data_al <- read_csv("data/al2023.csv")
+
+data_nolabels_al <- left_join(data_nolabels, data_al, by = "UNITID")
+
+data_nolabels_al <- data_nolabels_al %>%
+  # mutate(LTCRCLT = log10(LTCRCLT),
+  #        LSLIBRN = log10(LSLIBRN)) %>%
+  filter(!is.na(LTCRCLT) & !is.na(LSLIBRN))
+
+data_nolabels_al  <- data_nolabels_al %>%
+  drop_na(INSTSIZE)
+
+```
+
+I joined my two data files using the `left_join` function and used `UNITID` as the common variable. It is unclear to me how the NA are displaying.
+
+# Question 3: Visualization
+
+```{r}
+data_nolabels_al %>%
+  ggplot(aes(x =XLTCRCLT)) +
+  geom_bar()
+
+
+
+
+```
+
+# 3a
+
+```{r}
+data_nolabels_al %>%
+  ggplot(aes(x = LTCRCLT,
+             y = LSLIBRN)) +
+  geom_point(mapping = aes(color = factor ("INSTSIZE")), alpha = 0.5) +
+  geom_smooth(method = "loess", se = FALSE) +
+labs(title = "Academic Library Circulation",
+     caption = "Source: IPEDS",
+     x = "Library Circulation",
+     y = "Librarians") +
+  scale_x_continuous(trans='log10') +
+  theme_minimal() 
+
+```
+
+This box plot shows the relationship between circulation materials (physical and electronic) and the total number of librarians.
+
+# 3b
+
+```{r}
+data_nolabels_al %>%
+  ggplot(aes(x = XLTCRCLT, y = XLEXMSTL)) +
+  geom_point()
+
+
+```

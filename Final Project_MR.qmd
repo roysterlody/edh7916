@@ -1,0 +1,173 @@
+---
+title: "Final Project"
+author: "Melody Royster"
+date: today
+format: html
+execute:
+  echo: false 
+  warning: false
+  message: false
+code-fold: true
+code-tools: true
+editor_options: 
+  chunk_output_type: console
+---
+
+Instructions to Run
+
+I am using two .csv data files from *IPEDS*, the 2023 Academic Libraries AL2023 and Institutional characteristic, data/hd2022.csv. To run this code, download and save the files within a sub-folder called "data." Use library packages 'tidyverse', 'haven', 'sf', 'tigris', 'tidycensus' and read in the data per .csv file. The original *IPEDS* files are available for download at the following link: https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx?sid=5c05e2f4-be4f-4c65-a205-5b539f20afc7&rtid=7
+
+## Introduction
+Academic libraries play a crucial role in supporting student success at research institutions. They provide access to a wide range of resources, including books, journals, databases, and technology, as well as spaces for study and collaboration. The services offered by academic libraries can significantly impact student engagement and academic achievement. This report aims to analyze the relationship between academic libraries and student engagement at R1 research institutions, focusing on the characteristics of academic libraries and their impact on student success.
+
+The data used to support findings were sourced from the Integrated Post-secondary Education Data System (IPEDS) and the National Center for Education Statistics (NCES) and is publicly accessible. IPEDS features the unique services provided by academic libraries through the Academic Libraries Survey (ALS). Surveys are conducted annually and includes library resources, collections, expenditures, staffing and services from academic libraries within the United States at degree-granting post-secondary institutions (Academic Libraries Resource Center, 2025). The collected data is used to inform policy decisions and to support research on the role of academic libraries in higher education.
+
+## Academic Libraries and Student Engagement
+
+Research on student engagement supports that the time and effort students invest in their studies is positively correlated with their academic success (Astin,1993; Axelson & Flick, 2010; Kuh, 2001; Pascarella & Terenzini, 2005). Academic libraries provide a variety of resources and services that can enhance student engagement, including access to information, information literacy instruction, technology, and study spaces (Borrelli et al., 2015; Campbell et al., 2015; Schlak, 2018). The availability of these resources can help students develop the skills and knowledge necessary for academic success (Appleton, 2020). Anecdotal observations suggest that students who use libraries gain success in their academic pursuits by engaging more with their studies both within collaborative peer groups and during solo studying in a public setting. Arguments can be made that undergraduate students that utilize academic libraries perform better in their classes than undergraduate students that do not.
+
+## Academic Libraries Services across Institutions
+
+To determine if there is a relationship between academic libraries and student engagement, data from the IPEDS Academic Libraries Survey (ALS) was analyzed. The institutional characteristics were examined to provide more context of the resources available to academic libraries. The following key areas were examined: library digital collections available at different institutions based on size. 
+
+```{r}
+#| echo: false
+#| message: false
+library(tidyverse)
+library(haven)
+library(knitr)
+
+knitr::purl("Initial analyses.qmd", output = "Initial analyses.R")
+source("Initial analyses.R")
+
+
+data_nolabels_al %>%
+  ggplot(aes(x = LTCRCLT,
+             y = LSLIBRN)) +
+  geom_point(mapping = aes(color = factor (INSTSIZE)), alpha = 0.5) +
+  geom_smooth(method = "loess", se = FALSE) +
+labs(title = "Academic Library Circulation",
+     caption = "Source: IPEDS",
+     x = "Library Circulation",
+     y = "Librarians") +
+  scale_x_continuous(trans='log10') +
+  theme_minimal() 
+
+
+```
+
+The above box plot shows the distribution of library services across institutions of different sizes related to the number of librarians. The below figures shows the library digital collections available at different institutions based on size. Both figures show that the resources afforded to librarians is positively correlated with the size of the institution. Larger institutions tend to have more resources (e.g., collections and the number of librarians) to address the needs of their students users.
+
+```{r}
+#| echo: false
+
+data_nolabels2 <- read_csv("data/hd2022.csv")
+data_nolabels2 <- data_nolabels2 %>%
+  mutate(
+    INSTSIZE = case_when(
+      INSTSIZE == 1 ~ "Less than 1,000",
+      INSTSIZE == 2 ~ "1,000 to 4,999",
+      INSTSIZE == 3 ~ "5,000 to 9,999",
+      INSTSIZE == 4 ~ "10,000 or more",
+      TRUE ~ NA_character_
+    )
+  )
+
+data_nolabels2 %>%
+  count(INSTSIZE) 
+data_nolabels2 <- data_nolabels2 %>%
+  drop_na(INSTSIZE)
+
+data_al2 <- read_csv("data/al2023.csv")
+data_nolabels_al2 <- left_join(data_nolabels2, data_al2, by = "UNITID")
+
+
+ggplot(data_nolabels_al2) +
+  geom_boxplot(mapping = aes(x = INSTSIZE,
+                             y = LEDATAB,
+                             fill = INSTSIZE),
+               alpha = 0.66) +
+  scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8) +
+  labs(x = NULL,
+       y = "Libray Digital Circulation",
+       fill = "Institution Size") +
+  theme_linedraw()
+
+
+
+```
+  
+## Traditional Collections  
+
+```{r}
+#| echo: false
+#| results: hide
+
+# ggplot(data_nolabels_al) +
+#   geom_histogram(aes(x = LTCLLCT, y = after_stat(density)),
+#                  bins = 30,
+#                  fill = "white",
+#                  color = "black",
+#                  alpha = 0.5) +
+#   geom_density(mapping = aes(x = LTCLLCT),
+#                fill = "orange",
+#                alpha = 0.2) +
+#                labs(title = "Library Circulation Collection",
+#        caption = "Source: IPEDS",
+#        fill = "Library Physical Circulation") +
+#   theme_minimal() 
+
+library(tigris)
+library(sf)
+
+data_map <- states(cb = TRUE, resolution = "20m") |>
+  filter(STUSPS == "FL")
+
+data_map_points <- data_nolabels_al |>
+  #select(UNITID, LTCLLCT, INSTSIZE) |>
+  mutate(INSTSIZE = as.character(INSTSIZE)) |>
+  st_as_sf(coords = c("LONGITUD", "LATITUDE"), crs = 4326)
+
+ggplot() +
+  geom_sf(data = shift_geometry(data_map), fill = "white", color = "black") +
+  geom_sf(data = shift_geometry(data_map_points |> filter(FIPS == 12)),
+          aes(size = INSTSIZE,
+              color = LTCLLCT),
+          alpha = 0.5) +
+  scale_color_gradient(high = "red4", low = "yellow") +
+  labs(title = "Library Circulation Collection",
+       caption = "Source: IPEDS",
+       fill = "Library Physical Circulation") +
+  theme_minimal()
+
+```
+
+The above histogram plot with density overlay shows the distribution of library's circulating physical collections based on the size of the institution. The histogram shows that the distribution of library circulation collection is positively skewed, indicating that most institutions have a smaller number of circulating physical collections. The density overlay indicates that the majority of institutions have a library circulation collection of less than 100,000 items. As academic libraries continue to shift their collection strategies to focus on digital resources, the number of circulating physical collections may continue to decline. Items that do circulate usually are in high demand or are added to the collection by patron requests. 
+
+```{r}
+#| echo: false
+
+data_sum <- data_nolabels_al %>%
+  group_by(INSTSIZE) %>%
+  summarise(grad = mean(RPTMTH,
+                        na.rm = TRUE),
+            undergrad = mean(RPTMTH,
+                             na.rm = TRUE),
+           librarians = mean(LSLIBRN,
+                              na.rm = TRUE),
+            circulation = mean(LTCLLCT,
+                               na.rm = TRUE),
+            median_circulation = median(LTCLLCT,
+                                        na.rm = TRUE))
+ kable(data_sum)
+
+```
+
+The above table provide a statistical summary of academic libraries' full-time staff, librarians, and circulation collections by institution size. The summary statistics show that the mean library circulation collection is highest for large institutions, followed by a similar allotment of full time librarians and staff. The median library circulation collection is also highest for large institutions, indicating that large institutions have a larger number of circulating physical collections compared to medium and small institutions. The standard deviation is highest for large institutions, indicating where more variability in the number of circulating physical collections among large institutions compared to medium and small institutions. The mean number of librarians and staff is also highest for large institutions, indicating that larger institutions have more resources to support their library services. Student gradation rates are also highest for large institutions, indicating that larger institutions may have more resources to support their students' academic success.
+```{r}
+#| echo: false
+
+
+
+```
+
